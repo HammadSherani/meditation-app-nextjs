@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
+import { SelectGroup, SelectLabel } from '@radix-ui/react-select';
 
 export default function AIStudio() {
   const [prompt, setPrompt] = useState("");
@@ -23,7 +24,7 @@ export default function AIStudio() {
   const [audioUrl, setAudioUrl] = useState(null);
   const [voiceName, setVoiceName] = useState("");
   const [isNoisy, setIsNoisy] = useState(false);
-  
+
   // TTS & History States
   const [mood, setMood] = useState("");
   const [targetDuration, setTargetDuration] = useState("");
@@ -50,7 +51,7 @@ export default function AIStudio() {
           fetch("/api/get-voices"),
           fetch("/api/get-narrations")
         ]);
-        
+
         const voiceData = await voiceRes.json();
         if (voiceData.success) {
           setClonedVoices(voiceData.voices);
@@ -112,7 +113,7 @@ export default function AIStudio() {
         setPrompt(data.narration.script); // AI Generated Script
         setRecentNarrations(prev => [data.narration, ...prev]);
         toast.success("Narration Generated!");
-        
+
         const audio = new Audio(data.narration.audioUrl);
         audio.play();
       } else {
@@ -229,11 +230,11 @@ export default function AIStudio() {
           <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-2 mb-4">Voice Library</h3>
           <ScrollArea className="flex-1">
             {isLoading ? (
-               <div className="p-4 flex justify-center"><Loader2 className="animate-spin h-5 w-5 text-zinc-700" /></div>
+              <div className="p-4 flex justify-center"><Loader2 className="animate-spin h-5 w-5 text-zinc-700" /></div>
             ) : (
               clonedVoices.map((v) => (
-                <div 
-                  key={v.voice_id} 
+                <div
+                  key={v.voice_id}
                   onClick={() => setSelectedVoice(v.voice_id)}
                   className={`flex items-center justify-between p-3 mb-1 rounded-lg cursor-pointer transition-all ${selectedVoice === v.voice_id ? 'bg-zinc-800 border-zinc-700 shadow-md' : 'hover:bg-zinc-800/50'}`}
                 >
@@ -262,29 +263,75 @@ export default function AIStudio() {
             </Select>
 
             <Select value={mood} onValueChange={setMood}>
-              <SelectTrigger className="w-[140px] bg-zinc-900 border-zinc-800 h-10"><SelectValue placeholder="Mood" /></SelectTrigger>
-              <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
-                <SelectItem value="professional">Professional</SelectItem>
-                <SelectItem value="excited">Excited</SelectItem>
-                <SelectItem value="sad">Emotional</SelectItem>
-                <SelectItem value="funny">Funny</SelectItem>
-                <SelectItem value="nervous">Nervous</SelectItem>
+              <SelectTrigger className="w-[180px] bg-zinc-900 border-zinc-800 h-10 text-white">
+                <SelectValue placeholder="Select Mood" />
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-900 border-zinc-800 text-white max-h-[300px]">
+
+                <SelectGroup>
+                  <SelectLabel className="text-zinc-500 text-xs">Positive & Calm</SelectLabel>
+                  <SelectItem value="calm">Calm</SelectItem>
+                  <SelectItem value="peaceful">Peaceful</SelectItem>
+                  <SelectItem value="relaxed">Relaxed</SelectItem>
+                  <SelectItem value="happy">Happy</SelectItem>
+                  <SelectItem value="joyful">Joyful</SelectItem>
+                  <SelectItem value="grateful">Grateful</SelectItem>
+                  <SelectItem value="focused">Focused</SelectItem>
+                </SelectGroup>
+
+                <SelectGroup>
+                  <SelectLabel className="text-zinc-500 text-xs">High Energy</SelectLabel>
+                  <SelectItem value="excited">Excited</SelectItem>
+                  <SelectItem value="energetic">Energetic</SelectItem>
+                  <SelectItem value="playful">Playful</SelectItem>
+                  <SelectItem value="confident">Confident</SelectItem>
+                  <SelectItem value="surprised">Surprised</SelectItem>
+                </SelectGroup>
+
+                <SelectGroup>
+                  <SelectLabel className="text-zinc-500 text-xs">Difficult Emotions</SelectLabel>
+                  <SelectItem value="sad">Sad (Emotional)</SelectItem>
+                  <SelectItem value="depressed">Depressed</SelectItem>
+                  <SelectItem value="lonely">Lonely</SelectItem>
+                  <SelectItem value="disappointed">Disappointed</SelectItem>
+                  <SelectItem value="nostalgic">Nostalgic</SelectItem>
+                </SelectGroup>
+
+                <SelectGroup>
+                  <SelectLabel className="text-zinc-500 text-xs">Stress & Anger</SelectLabel>
+                  <SelectItem value="angry">Angry</SelectItem>
+                  <SelectItem value="aggressive">Aggressive</SelectItem>
+                  <SelectItem value="frustrated">Frustrated</SelectItem>
+                  <SelectItem value="anxious">Anxious</SelectItem>
+                  <SelectItem value="nervous">Nervous</SelectItem>
+                  <SelectItem value="overwhelmed">Overwhelmed</SelectItem>
+                </SelectGroup>
+
+                <SelectGroup>
+                  <SelectLabel className="text-zinc-500 text-xs">Low Energy</SelectLabel>
+                  <SelectItem value="tired">Tired</SelectItem>
+                  <SelectItem value="exhausted">Exhausted</SelectItem>
+                  <SelectItem value="bored">Bored</SelectItem>
+                  <SelectItem value="serious">Serious</SelectItem>
+                  <SelectItem value="neutral">Neutral</SelectItem>
+                </SelectGroup>
+
               </SelectContent>
             </Select>
 
             <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 h-10 rounded-md">
-               <span className="text-[10px] text-zinc-500 font-bold uppercase">Sec</span>
-               <input 
-                type="number" 
-                value={targetDuration} 
+              <span className="text-[10px] text-zinc-500 font-bold uppercase">Sec</span>
+              <input
+                type="number"
+                value={targetDuration}
                 onChange={(e) => setTargetDuration(e.target.value)}
                 placeholder="30"
                 className="w-10 bg-transparent text-sm focus:outline-none text-blue-400 font-bold placeholder:text-zinc-700"
-               />
+              />
             </div>
           </div>
 
-          <Button 
+          <Button
             onClick={handleGenerateTTS}
             disabled={isGenerating}
             className="bg-blue-600 hover:bg-blue-700 px-8 rounded-full font-bold shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
@@ -317,8 +364,8 @@ export default function AIStudio() {
                 {recentNarrations.map((item) => (
                   <Card key={item._id} className="bg-zinc-900/40 border-zinc-800 hover:border-zinc-700 transition-colors group">
                     <CardContent className="p-4 flex items-center gap-3">
-                      <Button 
-                        size="icon" 
+                      <Button
+                        size="icon"
                         className="h-10 w-10 rounded-full bg-blue-600/10 text-blue-500 hover:bg-blue-600 hover:text-white transition-all"
                         onClick={() => new Audio(item.audioUrl).play()}
                       >
