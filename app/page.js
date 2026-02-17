@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import VoiceLibrary from "@/components/VoiceLibrary";
 import StudioHeader from "@/components/StudioHeader";
 import RecentNarrations from "@/components/RecentNarrations";
+import OptionSection from '@/components/OptionSection';
 
 export default function AIStudio() {
   // State Management
@@ -30,7 +31,7 @@ export default function AIStudio() {
   const previewAudioRef = useRef(null);
 
 
-  
+
 
   // Initial Data Fetching
   useEffect(() => {
@@ -66,7 +67,7 @@ export default function AIStudio() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
+
       // Ambient Noise Check Logic
       setIsCheckingNoise(true);
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -82,11 +83,11 @@ export default function AIStudio() {
       setTimeout(() => {
         analyser.getByteFrequencyData(dataArray);
         const averageNoise = dataArray.reduce((a, b) => a + b) / bufferLength;
-        
+
         // Threshold: 35dB roughly maps to 40-50 in raw byte data
         if (averageNoise > 45) {
-          toast.error("Environment too noisy!", { 
-            description: "Please find a quieter place (Target < 35dB)." 
+          toast.error("Environment too noisy!", {
+            description: "Please find a quieter place (Target < 35dB)."
           });
           stream.getTracks().forEach(track => track.stop());
           setIsCheckingNoise(false);
@@ -172,7 +173,7 @@ export default function AIStudio() {
       const data = await response.json();
 
       if (data.success) {
-        setPrompt(data.narration.script); 
+        setPrompt(data.narration.script);
         setRecentNarrations(prev => [data.narration, ...prev]);
         toast.success("Narration Generated!");
         const audio = new Audio(data.narration.audioUrl);
@@ -205,8 +206,7 @@ export default function AIStudio() {
       {/* Hidden Global Audio for previews */}
       <audio ref={previewAudioRef} onEnded={() => setPlayingVoice(null)} hidden />
 
-      {/* Left Sidebar Component */}
-      <VoiceLibrary 
+      <VoiceLibrary
         clonedVoices={clonedVoices}
         selectedVoice={selectedVoice}
         setSelectedVoice={setSelectedVoice}
@@ -224,10 +224,8 @@ export default function AIStudio() {
         handleSaveVoice={handleSaveVoice}
       />
 
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col bg-[#0c0c0e]">
-        {/* Header Component */}
-        <StudioHeader 
+        <StudioHeader
           selectedVoice={selectedVoice}
           setSelectedVoice={setSelectedVoice}
           clonedVoices={clonedVoices}
@@ -239,19 +237,25 @@ export default function AIStudio() {
           isGenerating={isGenerating}
         />
 
-        {/* Editor Area */}
-        <div className="flex-1 p-12 flex justify-center overflow-y-auto">
-          <Textarea
-            placeholder="Type your topic here (e.g. A podcast intro about tech)..."
-            className="max-w-4xl min-h-[50%] bg-transparent border-none text-3xl focus-visible:ring-0 placeholder:text-zinc-800 resize-none leading-relaxed font-light"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
+        <div className="flex-1 p-3 flex justify-center overflow-hidden">
+          <div className='grid grid-cols-3 gap-2 w-full'>
+            <div className="col-span-2 bg-blue-600/20 p-4 rounded-lg flex flex-col">
+              <Textarea
+                placeholder="Type your topic here (e.g. A podcast intro about tech)..."
+                className="flex-1 w-full bg-transparent border-none text-3xl focus-visible:ring-0 placeholder:text-zinc-800 resize-none leading-relaxed font-light"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+              />
+            </div>
+
+            <OptionSection />
+
+          </div>
         </div>
       </main>
 
       {/* Right Sidebar - Recent Narrations */}
-      <RecentNarrations narrations={recentNarrations} />
+
     </div>
   );
 }

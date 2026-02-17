@@ -9,6 +9,7 @@ export default function StudioHeader({
   return (
     <header className="h-20 border-b border-zinc-800 flex items-center justify-between px-8 bg-[#09090b]/50 backdrop-blur-md sticky top-0 z-10">
       <div className="flex items-center gap-4">
+        <p className="text-sm text-zinc-400">Text to Speech</p>
         <Select value={selectedVoice} onValueChange={setSelectedVoice}>
           <SelectTrigger className="w-[180px] bg-zinc-900 border-zinc-800 h-10 text-white"><SelectValue placeholder="Voice" /></SelectTrigger>
           <SelectContent className="bg-zinc-900 border-zinc-800 text-white">

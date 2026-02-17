@@ -25,7 +25,7 @@ export default function RecentNarrations({ narrations = [] }) {
   };
 
   return (
-    <div className="w-80 bg-[#09090b] border-l border-zinc-800 flex flex-col overflow-hidden">
+    <div className="w-full bg-[#09090b] border-l border-zinc-800 flex flex-col overflow-hidden max-h-screen">
       {/* Header */}
       <div className="p-6 border-b border-zinc-800">
         <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
