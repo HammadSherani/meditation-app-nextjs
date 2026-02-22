@@ -136,12 +136,14 @@ export async function POST(req) {
             }).end(audioBuffer);
         });
 
+        const audioDuration = uploadResult.duration; 
+
         const newNarration = await Narration.create({
             title: userText,
             script: generatedScript,
             voiceName: voiceName,
             audioUrl: uploadResult.secure_url,
-            duration: duration,
+            duration: audioDuration,
             mood: currentMood,
         });
 

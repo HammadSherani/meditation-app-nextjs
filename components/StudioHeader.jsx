@@ -42,14 +42,14 @@ export default function StudioHeader({
         </div>
       </div>
 
-      <Button
+      {/* <Button
         onClick={handleGenerateTTS}
         disabled={isGenerating}
         className="bg-blue-600 hover:bg-blue-700 px-8 rounded-full font-bold shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
       >
         {isGenerating ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Sparkles className="mr-2 h-4 w-4" />}
         {isGenerating ? "AI Thinking..." : "Run Narration"}
-      </Button>
+      </Button> */}
     </header>
   );
 }
