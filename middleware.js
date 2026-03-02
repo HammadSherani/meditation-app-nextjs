@@ -1,18 +1,25 @@
 // middleware.js
 import { auth } from "./lib/auth";
 
-// Auth.js v5 mein aap directly auth ko export default karte hain
-export default auth((req) => {
+export const middleware = auth((req) => {
   const isLoggedIn = !!req.auth;
   const { nextUrl } = req;
 
-  // Agar user logged in nahi hai aur protected page pe hai
+  // Protect /dashboard route - redirect to login if not authenticated
   if (!isLoggedIn && nextUrl.pathname.startsWith("/dashboard")) {
     return Response.redirect(new URL("/login", nextUrl));
   }
+
+  // Can add more route protections here as needed
+  return undefined;
 });
 
+// Configure which routes should use this middleware
 export const config = {
-  // Un pages ko ignore karein jo static hain ya api routes hain
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    // Protect dashboard and other routes
+    "/dashboard/:path*",
+    // Add other protected routes here
+    // "/api/protected/:path*",
+  ],
 };

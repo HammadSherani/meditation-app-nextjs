@@ -4,7 +4,7 @@ import RecentNarrations from './RecentNarrations'
 
 function OptionSection() {
   const { narrations } = useNarrations()
-  const [activeTab, setActiveTab] = useState('history')
+  const [activeTab, setActiveTab] = useState('settings')
 
   return (
     <div className="h-full bg-zinc-900 rounded-lg overflow-hidden flex flex-col">

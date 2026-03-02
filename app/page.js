@@ -11,6 +11,9 @@ import RecentNarrations from "@/components/RecentNarrations";
 import OptionSection from '@/components/OptionSection';
 import { ChevronDown, ClosedCaption, Download, Pause, Play, RotateCcw, RotateCw, Share, ThumbsDown, ThumbsUp } from 'lucide-react';
 
+import { useSession } from "next-auth/react";
+import { useRouter } from 'next/navigation';
+
 export default function AIStudio() {
   // Redux Hook for Narrations
   const { narrations, addNarration } = useNarrations();
@@ -33,6 +36,11 @@ export default function AIStudio() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const { data: session } = useSession();
+  const router = useRouter();
+  
+
+
 
   const audioRef = useRef(null);
 
@@ -254,6 +262,14 @@ export default function AIStudio() {
   }, [narationdata]);
 
 
+  useEffect(() => {
+    if(!session) {
+      // toast.error("You must be logged in to access the studio.");
+      // alert("You must be logged in to access the studio.");
+      router.push("/login");
+    }
+  },[])
+
   console.log("narationdata", narationdata);
 
 
@@ -352,10 +368,10 @@ export default function AIStudio() {
 
               <div className="flex flex-col items-center flex-[1.5] max-w-2xl w-full">
                 <div className="flex items-center gap-8 mb-2">
-                  <button className="relative text-gray-500 hover:text-black transition-colors">
+                  {/* <button className="relative text-gray-500 hover:text-black transition-colors">
                     <RotateCcw size={22} strokeWidth={1.5} />
                     <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold mt-1">10</span>
-                  </button>
+                  </button> */}
 
                   <button
                     onClick={togglePlay}
@@ -368,10 +384,10 @@ export default function AIStudio() {
                     )}
                   </button>
 
-                  <button className="relative text-gray-500 hover:text-black transition-colors">
+                  {/* <button className="relative text-gray-500 hover:text-black transition-colors">
                     <RotateCw size={22} strokeWidth={1.5} />
                     <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold mt-1">10</span>
-                  </button>
+                  </button> */}
                 </div>
 
                 <div className="w-full flex items-center gap-3 group">
