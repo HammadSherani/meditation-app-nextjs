@@ -1,25 +1,40 @@
 // middleware.js
-import { auth } from "./lib/auth";
+import { getToken } from "next-auth/jwt";
+import { NextResponse } from "next/server";
 
-export const middleware = auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const { nextUrl } = req;
+export async function middleware(req) {
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const { pathname } = req.nextUrl;
 
-  // Protect /dashboard route - redirect to login if not authenticated
-  if (!isLoggedIn && nextUrl.pathname.startsWith("/dashboard")) {
-    return Response.redirect(new URL("/login", nextUrl));
+  // Public routes - accessible without login
+  const publicPaths = ["/login", "/signup", "/api/auth"];
+  const isPublicPath = publicPaths.some((path) => pathname.startsWith(path));
+
+  // If user is not logged in and trying to access a protected route
+  if (!token && !isPublicPath) {
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  // Can add more route protections here as needed
-  return undefined;
-});
+  // If user is logged in and trying to access login/signup - redirect to home
+  if (token && (pathname === "/login" || pathname === "/signup")) {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
 
-// Configure which routes should use this middleware
+  return NextResponse.next();
+}
+
+// Middleware runs only on these routes
 export const config = {
   matcher: [
-    // Protect dashboard and other routes
-    "/dashboard/:path*",
-    // Add other protected routes here
-    // "/api/protected/:path*",
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder files
+     */
+    "/((?!_next/static|_next/image|favicon.ico|public/).*)",
   ],
 };

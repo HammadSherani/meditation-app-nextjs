@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 import connectDB from "@/lib/db";
 import Voice from "@/models/Voice";
+import { requireAuth } from "@/lib/getSession";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -11,6 +12,10 @@ cloudinary.config({
 
 export async function POST(req) {
   try {
+    // Auth check
+    const auth = await requireAuth();
+    if (!auth.authenticated) return auth.response;
+
     const formData = await req.formData();
     const name = formData.get("name");
     const audioFile = formData.get("file");
@@ -20,14 +25,14 @@ export async function POST(req) {
       return NextResponse.json({ error: "Missing data" }, { status: 400 });
     }
 
-    // 1. Audio File ko Buffer mein convert karna Cloudinary ke liye
+    // 1. Convert audio file to buffer for Cloudinary upload
     const arrayBuffer = await audioFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 2. Cloudinary par Upload karna
+    // 2. Upload to Cloudinary
     const cloudinaryResponse = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream(
-        { resource_type: "video", folder: "voice_samples" }, // Audio ke liye resource_type "video" use hota hai
+        { resource_type: "video", folder: "voice_samples" }, // Audio uses resource_type "video" in Cloudinary
         (error, result) => {
           if (error) reject(error);
           else resolve(result);
@@ -35,7 +40,7 @@ export async function POST(req) {
       ).end(buffer);
     });
 
-    // 3. ElevenLabs par Voice Clone karna
+    // 3. Clone voice on ElevenLabs
     const elFormData = new FormData();
     elFormData.append("name", name);
     elFormData.append("files", audioFile, "sample.wav");
@@ -49,7 +54,7 @@ export async function POST(req) {
     const elData = await elResponse.json();
     if (!elResponse.ok) throw new Error("ElevenLabs failed");
 
-    // 4. MongoDB mein Save karna (With Cloudinary URL)
+    // 4. Save to MongoDB (with Cloudinary URL)
     await connectDB();
     const savedVoice = await Voice.create({
       name: name,

@@ -38,11 +38,22 @@ export default function AIStudio() {
   const [duration, setDuration] = useState(0);
   const { data: session } = useSession();
   const router = useRouter();
+
+  // Settings from OptionSection
+  const settingsRef = useRef({
+    speed: 50,
+    stability: 80,
+    similarity: 90,
+    styleExag: 0,
+    speakerBoost: true,
+    duration: 30,
+  });
   
 
 
 
   const audioRef = useRef(null);
+  const bgMusicRef = useRef(null);
 
   // Refs
   const mediaRecorder = useRef(null);
@@ -161,10 +172,18 @@ export default function AIStudio() {
     } catch (error) { toast.error("Error cloning voice"); }
   };
 
+  // Callback to receive settings from OptionSection
+  const handleSettingsChange = (newSettings) => {
+    settingsRef.current = { ...settingsRef.current, ...newSettings };
+  };
+
   // 3. Generate Narration (TTS)
   const handleGenerateTTS = async () => {
-    if (!selectedVoice || !prompt.trim() || !mood || !targetDuration) {
-      toast.error("Missing Fields", { description: "Please check voice, prompt, mood and duration." });
+    const currentSettings = settingsRef.current;
+    const currentDuration = currentSettings.duration || targetDuration;
+
+    if (!selectedVoice || !prompt.trim()) {
+      toast.error("Missing Fields", { description: "Please select a voice and enter a prompt." });
       return;
     }
 
@@ -179,8 +198,16 @@ export default function AIStudio() {
           voiceId: selectedVoice,
           voiceName: vName,
           userText: prompt,
-          duration: targetDuration,
-          mood: mood
+          duration: currentDuration,
+          mood: mood || "neutral",
+          settings: {
+            speed: currentSettings.speed,
+            stability: currentSettings.stability,
+            similarity: currentSettings.similarity,
+            styleExag: currentSettings.styleExag,
+            speakerBoost: currentSettings.speakerBoost,
+            duration: currentDuration,
+          }
         }),
       });
 
@@ -222,8 +249,10 @@ export default function AIStudio() {
 
     if (isPlaying) {
       audioRef.current.pause();
+      if (bgMusicRef.current) bgMusicRef.current.pause();
     } else {
       audioRef.current.play();
+      if (bgMusicRef.current) bgMusicRef.current.play();
     }
 
     setIsPlaying(!isPlaying);
@@ -239,28 +268,38 @@ export default function AIStudio() {
 
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
+useEffect(() => {
+    if (!narationdata?.audioUrl) return;
 
-  useEffect(() => {
-    if (narationdata?.audioUrl) {
-      const audio = new Audio(narationdata.audioUrl);
-      audioRef.current = audio;
-      setIsPlaying(true);
-      audio.play();
-
-      audio.addEventListener("loadedmetadata", () => {
-        setDuration(audio.duration);
-      });
-
-      audio.addEventListener("timeupdate", () => {
-        setCurrentTime(audio.currentTime);
-      });
-
-      audio.addEventListener("ended", () => {
-        setIsPlaying(false);
-      });
+    // Purana audio stop
+    if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
     }
-  }, [narationdata]);
 
+    setCurrentTime(0);
+    setDuration(0);
+
+    const audio = new Audio(narationdata.audioUrl);
+    audioRef.current = audio;
+
+    audio.addEventListener("loadedmetadata", () => setDuration(audio.duration));
+    audio.addEventListener("timeupdate", () => setCurrentTime(audio.currentTime));
+
+    audio.addEventListener("ended", () => {
+        setIsPlaying(false);
+    });
+
+    audio.play().catch(e => console.log('Auto-play blocked:', e));
+    setIsPlaying(true);
+
+    return () => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+        }
+    };
+}, [narationdata]);
 
   useEffect(() => {
     if(!session) {
@@ -270,7 +309,7 @@ export default function AIStudio() {
     }
   },[])
 
-  console.log("narationdata", narationdata);
+  // console.log("narationdata", narationdata);
 
 
   return (
@@ -340,98 +379,129 @@ export default function AIStudio() {
               </div>
             </div>
 
-            <OptionSection />
+            <OptionSection 
+               selectedVoice={selectedVoice}
+          setSelectedVoice={setSelectedVoice}
+          clonedVoices={clonedVoices}
+          mood={mood}
+          setMood={setMood}
+          onSettingsChange={handleSettingsChange}
+             />
 
           </div>
         </div>
 
 
-        {isPlayingPreview && (
-          <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-8">
+       {isPlayingPreview && narationdata && (
+  <div className="absolute bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 px-6 py-4 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
+    <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-6">
 
-              <div className="flex flex-col min-w-0 flex-1 group">
-                <h3 className="text-gray-900 font-medium truncate text-[17px] tracking-tight">
-                  {narationdata?.title || "Every small effort, every small step bring..."}
-                </h3>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex-shrink-0" />
-                  <p className="text-[13px] text-gray-500 truncate">
-                    <span className="font-medium text-gray-600">{narationdata?.voiceName || "Chris"}</span>
-                    <span className="mx-1.5">•</span>
-                    {narationdata?.mood || "Charming"}
-                    <span className="mx-1.5">•</span>
-                    Created {new Date(narationdata?.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
+      {/* Left — Info */}
+      <div className="flex flex-col min-w-0 flex-1">
+        <h3 className="text-white font-medium truncate text-sm">
+          {narationdata?.title?.substring(0, 60) || "Narration"}...
+        </h3>
+        <p className="text-xs text-zinc-500 mt-0.5">
+          <span className="text-zinc-400">{narationdata?.voiceName}</span>
+          <span className="mx-1.5">•</span>
+          {narationdata?.mood}
+          <span className="mx-1.5">•</span>
+          🎵 {narationdata?.bgMusicCategory?.replace('_', ' ')}
+        </p>
+      </div>
 
-              <div className="flex flex-col items-center flex-[1.5] max-w-2xl w-full">
-                <div className="flex items-center gap-8 mb-2">
-                  {/* <button className="relative text-gray-500 hover:text-black transition-colors">
-                    <RotateCcw size={22} strokeWidth={1.5} />
-                    <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold mt-1">10</span>
-                  </button> */}
+      {/* Center — Controls */}
+      <div className="flex flex-col items-center flex-[2] max-w-2xl w-full gap-2">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              if (!audioRef.current) return;
+              audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10);
+              setCurrentTime(audioRef.current.currentTime);
+            }}
+            className="w-9 h-9 rounded-full bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-all flex items-center justify-center"
+            title="Back 10s"
+          >
+            <RotateCcw size={16} />
+          </button>
 
-                  <button
-                    onClick={togglePlay}
-                    className="w-11 h-11 bg-black rounded-full flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all shadow-md"
-                  >
-                    {isPlaying ? (
-                      <Pause size={20} />
-                    ) : (
-                      <Play size={20} fill="currentColor" className="ml-0.5" />
-                    )}
-                  </button>
+          <button
+            onClick={togglePlay}
+            className="w-11 h-11 bg-white rounded-full flex items-center justify-center text-black hover:scale-105 active:scale-95 transition-all"
+          >
+            {isPlaying ? <Pause size={18} /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
+          </button>
 
-                  {/* <button className="relative text-gray-500 hover:text-black transition-colors">
-                    <RotateCw size={22} strokeWidth={1.5} />
-                    <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold mt-1">10</span>
-                  </button> */}
-                </div>
+          <button
+            onClick={() => {
+              if (!audioRef.current || !duration) return;
+              audioRef.current.currentTime = Math.min(duration, audioRef.current.currentTime + 10);
+              setCurrentTime(audioRef.current.currentTime);
+            }}
+            className="w-9 h-9 rounded-full bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-all flex items-center justify-center"
+            title="Forward 10s"
+          >
+            <RotateCw size={16} />
+          </button>
+        </div>
 
-                <div className="w-full flex items-center gap-3 group">
-                  <span className="text-[11px] font-medium text-gray-400 w-8 text-right">
-                    {formatTime(currentTime)}
-                  </span>
-                  <div className="relative flex-1 h-1.5 bg-gray-100 rounded-full cursor-pointer overflow-hidden">
-                    <div className="absolute top-0 left-0 h-full bg-gray-300 rounded-full transition-all"
-                      style={{ width: `${progress}%` }}>
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-medium text-gray-400 w-8">
-                    {formatTime(duration)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-5 flex-1 justify-end">
-                {/* <div className="flex items-center gap-1 border-r border-gray-100 pr-4 mr-1">
-                  <button className="p-2 text-gray-500 hover:bg-gray-50 rounded-full transition-colors">
-                    <ThumbsUp size={19} strokeWidth={1.5} />
-                  </button>
-                  <button className="p-2 text-gray-500 hover:bg-gray-50 rounded-full transition-colors">
-                    <ThumbsDown size={19} strokeWidth={1.5} />
-                  </button>
-                </div> */}
-
-                {/* <button className="flex items-center gap-2 px-5 py-2 border border-gray-200 rounded-full text-[14px] font-semibold text-gray-700 hover:bg-gray-50 transition-all active:bg-gray-100">
-                  <Share size={18} strokeWidth={2} />
-                  Share
-                </button> */}
-
-                <button className="p-2 text-gray-500 hover:text-black hover:bg-gray-50 rounded-full transition-all">
-                  <Download size={21} strokeWidth={1.5} />
-                </button>
-
-                <button className="p-1.5 text-gray-400 hover:text-black transition-colors">
-                  <ClosedCaption size={22} />
-                </button>
-              </div>
-
-            </div>
+        {/* ⭐ Seekable progress bar */}
+        <div className="w-full flex items-center gap-3">
+          <span className="text-[11px] text-zinc-500 w-8 text-right">{formatTime(currentTime)}</span>
+          <div
+            className="relative flex-1 h-1.5 bg-zinc-700 rounded-full cursor-pointer"
+            onClick={(e) => {
+              if (!audioRef.current || !duration) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              const percent = (e.clientX - rect.left) / rect.width;
+              const newTime = percent * duration;
+              audioRef.current.currentTime = newTime;
+              setCurrentTime(newTime);
+            }}
+          >
+            <div
+              className="absolute top-0 left-0 h-full bg-white rounded-full transition-none"
+              style={{ width: `${progress}%` }}
+            />
           </div>
-        )}
+          <span className="text-[11px] text-zinc-500 w-8">{formatTime(duration)}</span>
+        </div>
+      </div>
+
+      {/* Right — Actions */}
+      <div className="flex items-center gap-3 flex-1 justify-end">
+        {/* Download */}
+        <a
+          href={narationdata?.audioUrl}
+          download="narration.mp3"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition-all"
+          title="Download"
+        >
+          <Download size={19} strokeWidth={1.5} />
+        </a>
+
+        {/* Close */}
+        <button
+          onClick={() => {
+            if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+            if (bgMusicRef.current) { bgMusicRef.current.pause(); bgMusicRef.current = null; }
+            setIsPlaying(false);
+            setIsPlayingPreview(false);
+            setCurrentTime(0);
+            setDuration(0);
+          }}
+          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition-all"
+          title="Close"
+        >
+          ✕
+        </button>
+      </div>
+
+    </div>
+  </div>
+)}
 
 
       </main>
