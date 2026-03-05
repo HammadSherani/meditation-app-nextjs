@@ -1,21 +1,34 @@
 "use client";
 import React, { useRef, useState } from 'react';
 
-export default function RecentNarrations({ narrations = [] }) {
+export default function RecentNarrations({ narrations = [], onPlayNarration }) {
   const [playingId, setPlayingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState([]);
   const [downloadingId, setDownloadingId] = useState(null);
   const audioRef = useRef(null);
 
-  const togglePlayAudio = (url, id, e) => {
+  const togglePlayAudio = (narration, id, e) => {
     e.stopPropagation();
+    
+    // If onPlayNarration callback exists, play in main player
+    if (onPlayNarration) {
+      // Stop local preview if playing
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setPlayingId(null);
+      onPlayNarration(narration);
+      return;
+    }
+    
+    // Fallback: play locally if no callback
     if (playingId === id) {
       audioRef.current.pause();
       setPlayingId(null);
     } else {
       setPlayingId(id);
-      audioRef.current.src = url;
+      audioRef.current.src = narration.audioUrl;
       audioRef.current.play();
     }
   };
@@ -143,8 +156,8 @@ export default function RecentNarrations({ narrations = [] }) {
             </button>
 
             <button
-              onClick={(e) => togglePlayAudio(narration.audioUrl, id, e)}
-              title={isPlaying ? 'Pause' : 'Play'}
+              onClick={(e) => togglePlayAudio(narration, id, e)}
+              title={isPlaying ? 'Pause' : 'Play in Main Player'}
               className="text-zinc-500 hover:text-zinc-200 transition-colors p-1.5 rounded-md hover:bg-zinc-800"
             >
               {isPlaying ? (

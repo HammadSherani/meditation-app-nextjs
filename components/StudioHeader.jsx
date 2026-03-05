@@ -8,7 +8,7 @@ export default function StudioHeader({
   targetDuration, setTargetDuration, handleGenerateTTS, isGenerating 
 }) {
   return (
-    <header className="h-20 border-b border-zinc-800 flex items-center justify-between px-8 bg-[#09090b]/50 backdrop-blur-md sticky top-0 z-10">
+    <header className="h-20 border-b relative  border-zinc-800 flex items-center justify-between px-8 bg-[#09090b]/50 backdrop-blur-md z-20">
       <div className="flex items-center gap-4">
         <p className="text-sm text-white">Text to Speech</p>
         {/* <Select value={selectedVoice} onValueChange={setSelectedVoice}>

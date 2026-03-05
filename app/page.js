@@ -46,6 +46,8 @@ export default function AIStudio() {
   const [showMusicModal, setShowMusicModal] = useState(false);
   const [selectedBgMusic, setSelectedBgMusic] = useState(null);
   const [bgMusicVolume, setBgMusicVolume] = useState(0.15); // Low volume for background
+  const [speechVolume, setSpeechVolume] = useState(1.0); // Full volume for speech
+  const [showVolumeControls, setShowVolumeControls] = useState(false); // Toggle volume panel
 
   // Settings from OptionSection
   const settingsRef = useRef({
@@ -312,6 +314,45 @@ export default function AIStudio() {
     toast.info("Background music removed");
   };
 
+  // Real-time volume handlers
+  const handleSpeechVolumeChange = (value) => {
+    const vol = parseFloat(value);
+    setSpeechVolume(vol);
+    if (audioRef.current) {
+      audioRef.current.volume = vol;
+    }
+  };
+
+  const handleBgMusicVolumeChange = (value) => {
+    const vol = parseFloat(value);
+    setBgMusicVolume(vol);
+    if (bgMusicRef.current) {
+      bgMusicRef.current.volume = vol;
+    }
+  };
+
+  // Play narration from history in main player
+  const handlePlayFromHistory = (narration) => {
+    // Stop current playback
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (bgMusicRef.current) {
+      bgMusicRef.current.pause();
+      bgMusicRef.current = null;
+    }
+    
+    // Reset states
+    setSelectedBgMusic(null);
+    setCurrentTime(0);
+    setDuration(0);
+    
+    // Set new narration data - this will trigger the useEffect to play
+    setNarrationData(narration);
+    setIsPlayingPreview(true);
+  };
+
   // Download functions
   const handleDownloadSpeechOnly = () => {
     if (!narationdata?.audioUrl) return;
@@ -380,6 +421,7 @@ useEffect(() => {
     setDuration(0);
 
     const audio = new Audio(narationdata.audioUrl);
+    audio.volume = speechVolume; // Apply current speech volume
     audioRef.current = audio;
 
     audio.addEventListener("loadedmetadata", () => setDuration(audio.duration));
@@ -493,6 +535,7 @@ useEffect(() => {
           mood={mood}
           setMood={setMood}
           onSettingsChange={handleSettingsChange}
+          onPlayNarration={handlePlayFromHistory}
              />
 
           </div>
@@ -588,6 +631,82 @@ useEffect(() => {
 
       {/* Right — Actions */}
       <div className="flex items-center gap-2 flex-1 justify-end">
+        {/* Volume Controls */}
+        <div className="relative">
+          <button
+            onClick={() => setShowVolumeControls(!showVolumeControls)}
+            className={`p-2 rounded-full transition-all ${
+              showVolumeControls 
+                ? "bg-zinc-700 text-white" 
+                : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+            }`}
+            title="Volume Controls"
+          >
+            <Volume2 size={18} />
+          </button>
+          
+          {/* Volume Panel */}
+          {showVolumeControls && (
+            <div className="absolute bottom-full mb-2 right-0 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl p-4 w-64 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-medium text-white">Volume Mixer</h4>
+                <button 
+                  onClick={() => setShowVolumeControls(false)}
+                  className="text-zinc-500 hover:text-zinc-300"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              
+              {/* Speech Volume */}
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-zinc-400 flex items-center gap-1.5">
+                    🎙️ Speech Volume
+                  </label>
+                  <span className="text-xs text-zinc-500">{Math.round(speechVolume * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={speechVolume}
+                  onChange={(e) => handleSpeechVolumeChange(e.target.value)}
+                  className="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-125"
+                />
+              </div>
+              
+              {/* Background Music Volume */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-zinc-400 flex items-center gap-1.5">
+                    🎵 Music Volume
+                  </label>
+                  <span className="text-xs text-zinc-500">{Math.round(bgMusicVolume * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={bgMusicVolume}
+                  onChange={(e) => handleBgMusicVolumeChange(e.target.value)}
+                  disabled={!selectedBgMusic}
+                  className={`w-full h-1.5 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-125 ${
+                    selectedBgMusic 
+                      ? "bg-zinc-700 [&::-webkit-slider-thumb]:bg-blue-400" 
+                      : "bg-zinc-800 opacity-50 cursor-not-allowed [&::-webkit-slider-thumb]:bg-zinc-600"
+                  }`}
+                />
+                {!selectedBgMusic && (
+                  <p className="text-[10px] text-zinc-600">Add background music to adjust</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Add Background Music Button */}
         <button
           onClick={() => setShowMusicModal(true)}

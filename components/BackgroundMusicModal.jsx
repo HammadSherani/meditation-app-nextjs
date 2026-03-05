@@ -22,6 +22,9 @@ import {
   RotateCw,
   Volume2,
   Loader2,
+  Upload,
+  X,
+  FileAudio,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -67,7 +70,6 @@ function TrackTimeline({
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
 
-  // Fake waveform shape (decorative bars)
   const waveHeights = [
     3, 6, 10, 14, 9, 5, 12, 16, 11, 7, 4, 8, 13, 15, 10, 6, 3, 9, 14, 12,
     7, 5, 11, 16, 8, 4, 6, 13, 10, 9, 5, 12, 15, 11, 7, 3, 8, 14, 10, 6,
@@ -76,7 +78,6 @@ function TrackTimeline({
 
   return (
     <div className="mt-3 space-y-2">
-      {/* Waveform timeline */}
       <div
         className="relative w-full h-10 cursor-pointer group"
         onClick={(e) => {
@@ -86,7 +87,6 @@ function TrackTimeline({
           onSeek(pct);
         }}
       >
-        {/* Waveform bars */}
         <div className="absolute inset-0 flex items-center gap-[2px] overflow-hidden">
           {waveHeights.map((h, i) => {
             const barPct = ((i + 0.5) / waveHeights.length) * 100;
@@ -108,7 +108,6 @@ function TrackTimeline({
           })}
         </div>
 
-        {/* Playhead */}
         {isActive && (
           <div
             className="absolute top-0 bottom-0 w-[2px] bg-blue-400 rounded-full shadow-[0_0_6px_#3b82f6] pointer-events-none transition-all duration-100"
@@ -119,7 +118,6 @@ function TrackTimeline({
         )}
       </div>
 
-      {/* Controls row */}
       <div className="flex items-center gap-2">
         <button
           onClick={(e) => { e.stopPropagation(); onSeekBackward(e); }}
@@ -128,7 +126,6 @@ function TrackTimeline({
           <RotateCcw size={11} />
         </button>
 
-        {/* Time labels */}
         <div className="flex-1 flex justify-between text-[10px] font-mono text-zinc-500">
           <span className="text-blue-400">{formatTime(currentTime)}</span>
           <span>{formatTime(duration)}</span>
@@ -145,6 +142,140 @@ function TrackTimeline({
   );
 }
 
+// Reusable track list item
+function TrackItem({
+  track,
+  isPlaying,
+  isSelected,
+  previewProgress,
+  previewCurrentTime,
+  previewDuration,
+  playingTrackId,
+  onTogglePreview,
+  onSelectTrack,
+  onSeekByPercent,
+  onSeekPreview,
+  onRemoveUploaded,
+  categoryColors,
+}) {
+  const catClass =
+    categoryColors[track.category] ||
+    "bg-zinc-700/40 text-zinc-400 border border-zinc-700/50";
+
+  return (
+    <div
+      onClick={() => onSelectTrack(track)}
+      className="relative rounded-xl cursor-pointer transition-all duration-200 overflow-hidden"
+      style={{
+        background: isSelected
+          ? "linear-gradient(135deg, rgba(37,99,235,0.18) 0%, rgba(124,58,237,0.10) 100%)"
+          : isPlaying
+          ? "rgba(59,130,246,0.07)"
+          : "rgba(255,255,255,0.03)",
+        border: isSelected
+          ? "1px solid rgba(59,130,246,0.4)"
+          : isPlaying
+          ? "1px solid rgba(59,130,246,0.2)"
+          : "1px solid rgba(255,255,255,0.05)",
+        boxShadow: isSelected
+          ? "0 0 0 1px rgba(59,130,246,0.15) inset, 0 4px 20px rgba(59,130,246,0.08)"
+          : "none",
+      }}
+    >
+      <div className="p-3.5">
+        <div className="flex items-center gap-3">
+          {/* Play button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePreview(track);
+            }}
+            className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200"
+            style={{
+              background: isPlaying
+                ? "linear-gradient(135deg, #2563eb, #7c3aed)"
+                : "rgba(255,255,255,0.07)",
+              boxShadow: isPlaying
+                ? "0 0 16px rgba(59,130,246,0.5)"
+                : "none",
+              border: isPlaying
+                ? "1px solid rgba(99,102,241,0.4)"
+                : "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            {isPlaying ? (
+              <Pause size={14} className="text-white" />
+            ) : (
+              <Play size={14} className="text-zinc-300 ml-0.5" />
+            )}
+          </button>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[13px] font-medium text-white truncate">
+                {track.name}
+              </span>
+              {isPlaying && <WaveformBars isPlaying={true} />}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${catClass}`}>
+                {track.category}
+              </span>
+              {track.isUploaded && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-700/50 text-zinc-400">
+                  Uploaded
+                </span>
+              )}
+            </div>
+
+            {isPlaying && (
+              <TrackTimeline
+                progress={previewProgress}
+                currentTime={previewCurrentTime}
+                duration={previewDuration}
+                onSeek={onSeekByPercent}
+                trackId={track.id}
+                playingTrackId={playingTrackId}
+                onSeekBackward={(e) => onSeekPreview(e, false)}
+                onSeekForward={(e) => onSeekPreview(e, true)}
+              />
+            )}
+          </div>
+
+          {/* Selection + remove */}
+          <div className="flex items-center gap-2">
+            {track.isUploaded && onRemoveUploaded && (
+              <button
+                onClick={(e) => onRemoveUploaded(track.id, e)}
+                className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+                title="Remove uploaded track"
+              >
+                <X size={12} />
+              </button>
+            )}
+
+            <div
+              className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all duration-200"
+              style={{
+                background: isSelected
+                  ? "linear-gradient(135deg, #2563eb, #7c3aed)"
+                  : "transparent",
+                border: isSelected
+                  ? "none"
+                  : "1.5px solid rgba(255,255,255,0.15)",
+                boxShadow: isSelected
+                  ? "0 0 10px rgba(59,130,246,0.5)"
+                  : "none",
+              }}
+            >
+              {isSelected && <Check size={11} className="text-white" />}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BackgroundMusicModal({
   open,
   onOpenChange,
@@ -152,7 +283,6 @@ export default function BackgroundMusicModal({
   currentSpeechUrl,
 }) {
   const [tracks, setTracks] = useState([]);
-  const [filteredTracks, setFilteredTracks] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedTrack, setSelectedTrack] = useState(null);
@@ -162,27 +292,25 @@ export default function BackgroundMusicModal({
   const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
   const [isApplying, setIsApplying] = useState(false);
 
+  // Upload states
+  const [uploadedTracks, setUploadedTracks] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showUploadSection, setShowUploadSection] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // ── NEW: active tab state ──
+  const [activeTab, setActiveTab] = useState("api"); // "api" | "my"
+
   const previewAudioRef = useRef(null);
   const progressIntervalRef = useRef(null);
+
+  const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/m4a', 'audio/x-m4a'];
+  const ALLOWED_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.m4a'];
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
   useEffect(() => {
     if (open) fetchTracks();
   }, [open]);
-
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredTracks(tracks);
-    } else {
-      const q = searchQuery.toLowerCase();
-      setFilteredTracks(
-        tracks.filter(
-          (t) =>
-            t.name.toLowerCase().includes(q) ||
-            t.category.toLowerCase().includes(q)
-        )
-      );
-    }
-  }, [searchQuery, tracks]);
 
   useEffect(() => {
     if (!open) {
@@ -192,6 +320,88 @@ export default function BackgroundMusicModal({
     }
   }, [open]);
 
+  // Switch to My Music tab automatically when a track is uploaded
+  useEffect(() => {
+    if (uploadedTracks.length > 0) {
+      setActiveTab("my");
+    }
+  }, [uploadedTracks.length]);
+
+  // Filtered tracks per tab
+  const filteredApiTracks = tracks.filter((t) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return t.name.toLowerCase().includes(q) || t.category.toLowerCase().includes(q);
+  });
+
+  const filteredMyTracks = uploadedTracks.filter((t) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return t.name.toLowerCase().includes(q) || t.category.toLowerCase().includes(q);
+  });
+
+  const activeList = activeTab === "api" ? filteredApiTracks : filteredMyTracks;
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    const isValidType = ALLOWED_AUDIO_TYPES.includes(file.type) || ALLOWED_EXTENSIONS.includes(fileExtension);
+
+    if (!isValidType) {
+      toast.error("Invalid file type", { description: "Please upload an audio file (MP3, WAV, OGG, M4A)" });
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File too large", { description: "Maximum file size is 10MB" });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const objectUrl = URL.createObjectURL(file);
+      const fileName = file.name.replace(/\.[^/.]+$/, "");
+      const cleanName = fileName
+        .replace(/[-_]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .split(" ")
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(" ");
+
+      const newTrack = {
+        id: `uploaded-${Date.now()}`,
+        name: cleanName,
+        filename: file.name,
+        url: objectUrl,
+        category: "Custom",
+        isUploaded: true,
+      };
+
+      setUploadedTracks(prev => [newTrack, ...prev]);
+      setShowUploadSection(false);
+      toast.success("Music uploaded!", { description: `"${cleanName}" added to My Music` });
+    } catch (error) {
+      toast.error("Upload failed", { description: "Could not process the audio file" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveUploadedTrack = (trackId, e) => {
+    e.stopPropagation();
+    const track = uploadedTracks.find(t => t.id === trackId);
+    if (track) {
+      URL.revokeObjectURL(track.url);
+      setUploadedTracks(prev => prev.filter(t => t.id !== trackId));
+      if (selectedTrack?.id === trackId) setSelectedTrack(null);
+      if (playingTrackId === trackId) stopPreview();
+      toast.info("Track removed");
+    }
+  };
+
   const fetchTracks = async () => {
     setLoading(true);
     try {
@@ -199,7 +409,6 @@ export default function BackgroundMusicModal({
       const data = await res.json();
       if (data.success) {
         setTracks(data.tracks);
-        setFilteredTracks(data.tracks);
       } else {
         toast.error("Failed to load music tracks");
       }
@@ -290,13 +499,13 @@ export default function BackgroundMusicModal({
     }
   };
 
-  // Category color map
   const categoryColors = {
     Ambient: "bg-violet-500/20 text-violet-300 border border-violet-500/30",
     Jazz: "bg-amber-500/20 text-amber-300 border border-amber-500/30",
     Classical: "bg-rose-500/20 text-rose-300 border border-rose-500/30",
     Electronic: "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30",
     Nature: "bg-green-500/20 text-green-300 border border-green-500/30",
+    Custom: "bg-blue-500/20 text-blue-300 border border-blue-500/30",
   };
 
   return (
@@ -347,13 +556,115 @@ export default function BackgroundMusicModal({
               }}
             />
           </div>
+
+          {/* ── TABS ── */}
+          <div className="mt-4 flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <button
+              onClick={() => setActiveTab("api")}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200"
+              style={{
+                background: activeTab === "api" ? "rgba(59,130,246,0.2)" : "transparent",
+                color: activeTab === "api" ? "#60a5fa" : "#71717a",
+                border: activeTab === "api" ? "1px solid rgba(59,130,246,0.3)" : "1px solid transparent",
+              }}
+            >
+              <Music size={13} />
+              API Music
+              <span
+                className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-semibold"
+                style={{
+                  background: activeTab === "api" ? "rgba(59,130,246,0.3)" : "rgba(255,255,255,0.08)",
+                  color: activeTab === "api" ? "#93c5fd" : "#52525b",
+                }}
+              >
+                {tracks.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("my")}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200"
+              style={{
+                background: activeTab === "my" ? "rgba(59,130,246,0.2)" : "transparent",
+                color: activeTab === "my" ? "#60a5fa" : "#71717a",
+                border: activeTab === "my" ? "1px solid rgba(59,130,246,0.3)" : "1px solid transparent",
+              }}
+            >
+              <Upload size={13} />
+              My Music
+              <span
+                className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-semibold"
+                style={{
+                  background: activeTab === "my" ? "rgba(59,130,246,0.3)" : "rgba(255,255,255,0.08)",
+                  color: activeTab === "my" ? "#93c5fd" : "#52525b",
+                }}
+              >
+                {uploadedTracks.length}
+              </span>
+            </button>
+          </div>
+
+          {/* Upload section — only shown on My Music tab */}
+          {activeTab === "my" && (
+            <div className="mt-3">
+              <button
+                onClick={() => setShowUploadSection(!showUploadSection)}
+                className="flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg transition-all w-full justify-center"
+                style={{
+                  background: showUploadSection ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.05)",
+                  border: showUploadSection ? "1px solid rgba(59,130,246,0.3)" : "1px dashed rgba(255,255,255,0.12)",
+                  color: showUploadSection ? "#60a5fa" : "#a1a1aa"
+                }}
+              >
+                <Upload size={14} />
+                Upload Your Music
+              </button>
+
+              {showUploadSection && (
+                <div
+                  className="mt-3 p-4 rounded-xl border-2 border-dashed transition-all"
+                  style={{ background: "rgba(59,130,246,0.05)", borderColor: "rgba(59,130,246,0.2)" }}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".mp3,.wav,.ogg,.m4a,audio/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="bg-music-upload"
+                  />
+
+                  {isUploading ? (
+                    <div className="flex flex-col items-center justify-center py-4 gap-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+                      <span className="text-xs text-zinc-400">Processing audio...</span>
+                    </div>
+                  ) : (
+                    <label
+                      htmlFor="bg-music-upload"
+                      className="flex flex-col items-center justify-center py-2 cursor-pointer group"
+                    >
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all group-hover:scale-110"
+                        style={{ background: "rgba(59,130,246,0.15)" }}
+                      >
+                        <FileAudio size={18} className="text-blue-400" />
+                      </div>
+                      <span className="text-sm font-medium text-white">Click to upload audio</span>
+                      <span className="text-[10px] text-zinc-500 mt-1">MP3, WAV, OGG, M4A • Max 10MB</span>
+                    </label>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Count badge */}
         {!loading && (
           <div className="px-6 pb-2 flex items-center gap-2">
             <span className="text-[11px] text-zinc-600 uppercase tracking-widest font-medium">
-              {filteredTracks.length} track{filteredTracks.length !== 1 ? "s" : ""}
+              {activeList.length} track{activeList.length !== 1 ? "s" : ""}
             </span>
             <div className="flex-1 h-[1px] bg-white/5" />
           </div>
@@ -361,7 +672,7 @@ export default function BackgroundMusicModal({
 
         {/* Track List */}
         <ScrollArea className="flex-1 px-6 overflow-y-auto">
-          {loading ? (
+          {loading && activeTab === "api" ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <div className="relative">
                 <div className="w-12 h-12 rounded-full border border-blue-500/20 animate-pulse" />
@@ -369,124 +680,38 @@ export default function BackgroundMusicModal({
               </div>
               <p className="text-xs text-zinc-600">Loading tracks...</p>
             </div>
-          ) : filteredTracks.length === 0 ? (
+          ) : activeList.length === 0 ? (
             <div className="text-center py-16">
               <Music className="w-10 h-10 mx-auto mb-3 text-zinc-700" />
-              <p className="text-sm text-zinc-600">No tracks found</p>
+              {activeTab === "my" ? (
+                <>
+                  <p className="text-sm text-zinc-600">No uploaded tracks yet</p>
+                  <p className="text-xs text-zinc-700 mt-1">Upload an MP3, WAV, OGG, or M4A file above</p>
+                </>
+              ) : (
+                <p className="text-sm text-zinc-600">No tracks found</p>
+              )}
             </div>
           ) : (
             <div className="space-y-2 pb-4">
-              {filteredTracks.map((track) => {
-                const isPlaying = playingTrackId === track.id;
-                const isSelected = selectedTrack?.id === track.id;
-                const catClass =
-                  categoryColors[track.category] ||
-                  "bg-zinc-700/40 text-zinc-400 border border-zinc-700/50";
-
-                return (
-                  <div
-                    key={track.id}
-                    onClick={() => handleSelectTrack(track)}
-                    className="relative rounded-xl cursor-pointer transition-all duration-200 overflow-hidden"
-                    style={{
-                      background: isSelected
-                        ? "linear-gradient(135deg, rgba(37,99,235,0.18) 0%, rgba(124,58,237,0.10) 100%)"
-                        : isPlaying
-                        ? "rgba(59,130,246,0.07)"
-                        : "rgba(255,255,255,0.03)",
-                      border: isSelected
-                        ? "1px solid rgba(59,130,246,0.4)"
-                        : isPlaying
-                        ? "1px solid rgba(59,130,246,0.2)"
-                        : "1px solid rgba(255,255,255,0.05)",
-                      boxShadow: isSelected
-                        ? "0 0 0 1px rgba(59,130,246,0.15) inset, 0 4px 20px rgba(59,130,246,0.08)"
-                        : "none",
-                    }}
-                  >
-                    <div className="p-3.5">
-                      <div className="flex items-center gap-3">
-                        {/* Play button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            togglePreview(track);
-                          }}
-                          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200"
-                          style={{
-                            background: isPlaying
-                              ? "linear-gradient(135deg, #2563eb, #7c3aed)"
-                              : "rgba(255,255,255,0.07)",
-                            boxShadow: isPlaying
-                              ? "0 0 16px rgba(59,130,246,0.5)"
-                              : "none",
-                            border: isPlaying
-                              ? "1px solid rgba(99,102,241,0.4)"
-                              : "1px solid rgba(255,255,255,0.08)",
-                          }}
-                        >
-                          {isPlaying ? (
-                            <Pause size={14} className="text-white" />
-                          ) : (
-                            <Play size={14} className="text-zinc-300 ml-0.5" />
-                          )}
-                        </button>
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[13px] font-medium text-white truncate">
-                              {track.name}
-                            </span>
-                            {isPlaying && (
-                              <WaveformBars isPlaying={true} />
-                            )}
-                            <span
-                              className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${catClass}`}
-                            >
-                              {track.category}
-                            </span>
-                          </div>
-
-                          {/* Timeline — shown when playing */}
-                          {isPlaying && (
-                            <TrackTimeline
-                              progress={previewProgress}
-                              currentTime={previewCurrentTime}
-                              duration={previewDuration}
-                              onSeek={handleSeekByPercent}
-                              trackId={track.id}
-                              playingTrackId={playingTrackId}
-                              onSeekBackward={(e) => seekPreview(e, false)}
-                              onSeekForward={(e) => seekPreview(e, true)}
-                            />
-                          )}
-                        </div>
-
-                        {/* Selection circle */}
-                        <div
-                          className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all duration-200"
-                          style={{
-                            background: isSelected
-                              ? "linear-gradient(135deg, #2563eb, #7c3aed)"
-                              : "transparent",
-                            border: isSelected
-                              ? "none"
-                              : "1.5px solid rgba(255,255,255,0.15)",
-                            boxShadow: isSelected
-                              ? "0 0 10px rgba(59,130,246,0.5)"
-                              : "none",
-                          }}
-                        >
-                          {isSelected && (
-                            <Check size={11} className="text-white" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {activeList.map((track) => (
+                <TrackItem
+                  key={track.id}
+                  track={track}
+                  isPlaying={playingTrackId === track.id}
+                  isSelected={selectedTrack?.id === track.id}
+                  previewProgress={previewProgress}
+                  previewCurrentTime={previewCurrentTime}
+                  previewDuration={previewDuration}
+                  playingTrackId={playingTrackId}
+                  onTogglePreview={togglePreview}
+                  onSelectTrack={handleSelectTrack}
+                  onSeekByPercent={handleSeekByPercent}
+                  onSeekPreview={seekPreview}
+                  onRemoveUploaded={track.isUploaded ? handleRemoveUploadedTrack : null}
+                  categoryColors={categoryColors}
+                />
+              ))}
             </div>
           )}
         </ScrollArea>

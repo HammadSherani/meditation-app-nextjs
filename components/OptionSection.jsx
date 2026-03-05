@@ -3,7 +3,7 @@ import { useNarrations } from '@/lib/hooks/useNarrations'
 import RecentNarrations from './RecentNarrations'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 
-function OptionSection({ selectedVoice, setSelectedVoice, clonedVoices, mood, setMood, onSettingsChange }) {
+function OptionSection({ selectedVoice, setSelectedVoice, clonedVoices, mood, setMood, onSettingsChange, onPlayNarration }) {
   const { narrations } = useNarrations()
   const [activeTab, setActiveTab] = useState('settings')
   const [duration, setDuration] = useState(30);
@@ -71,7 +71,7 @@ function OptionSection({ selectedVoice, setSelectedVoice, clonedVoices, mood, se
 
       {/* Tab Content */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === 'history' && <RecentNarrations narrations={narrations} />}
+        {activeTab === 'history' && <RecentNarrations narrations={narrations} onPlayNarration={onPlayNarration} />}
 
         {activeTab === 'settings' && (
           <div className="h-full overflow-y-auto p-4 space-y-6">
