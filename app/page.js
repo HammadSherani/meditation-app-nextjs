@@ -9,7 +9,9 @@ import VoiceLibrary from "@/components/VoiceLibrary";
 import StudioHeader from "@/components/StudioHeader";
 import RecentNarrations from "@/components/RecentNarrations";
 import OptionSection from '@/components/OptionSection';
-import { ChevronDown, ClosedCaption, Download, Pause, Play, RotateCcw, RotateCw, Share, ThumbsDown, ThumbsUp } from 'lucide-react';
+import BackgroundMusicModal from '@/components/BackgroundMusicModal';
+import { ChevronDown, ClosedCaption, Download, Pause, Play, RotateCcw, RotateCw, Share, ThumbsDown, ThumbsUp, Music, X, Volume2 } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
 import { useSession } from "next-auth/react";
 import { useRouter } from 'next/navigation';
@@ -38,6 +40,12 @@ export default function AIStudio() {
   const [duration, setDuration] = useState(0);
   const { data: session } = useSession();
   const router = useRouter();
+
+  // Background Music States
+  const [showMusicPopup, setShowMusicPopup] = useState(false);
+  const [showMusicModal, setShowMusicModal] = useState(false);
+  const [selectedBgMusic, setSelectedBgMusic] = useState(null);
+  const [bgMusicVolume, setBgMusicVolume] = useState(0.15); // Low volume for background
 
   // Settings from OptionSection
   const settingsRef = useRef({
@@ -218,9 +226,13 @@ export default function AIStudio() {
         addNarration(data.narration);
         setIsPlayingPreview(true);
         setNarrationData(data.narration);
+        setSelectedBgMusic(null); // Reset any previous bg music selection
         toast.success("Narration Generated!");
-        // const audio = new Audio(data.narration.audioUrl);
-        // audio.play();
+        
+        // Show popup after short delay
+        setTimeout(() => {
+          setShowMusicPopup(true);
+        }, 2000);
       } else {
         toast.error(data.error || "Generation failed");
       }
@@ -266,6 +278,89 @@ export default function AIStudio() {
     return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
   };
 
+  // Handle Background Music Selection
+  const handleMusicSelect = ({ track }) => {
+    setSelectedBgMusic(track);
+    setShowMusicPopup(false);
+
+    // Setup background music audio
+    if (bgMusicRef.current) {
+      bgMusicRef.current.pause();
+      bgMusicRef.current = null;
+    }
+
+    const bgAudio = new Audio(track.url);
+    bgAudio.volume = bgMusicVolume;
+    bgAudio.loop = true;
+    bgMusicRef.current = bgAudio;
+
+    // If speech is playing, start bg music too
+    if (isPlaying && audioRef.current) {
+      bgAudio.play().catch((e) => console.log("BG music autoplay blocked:", e));
+    }
+
+    toast.success(`Added "${track.name}" as background music`);
+  };
+
+  // Remove Background Music
+  const handleRemoveBgMusic = () => {
+    if (bgMusicRef.current) {
+      bgMusicRef.current.pause();
+      bgMusicRef.current = null;
+    }
+    setSelectedBgMusic(null);
+    toast.info("Background music removed");
+  };
+
+  // Download functions
+  const handleDownloadSpeechOnly = () => {
+    if (!narationdata?.audioUrl) return;
+    
+    const link = document.createElement("a");
+    link.href = narationdata.audioUrl;
+    link.download = `speech-${Date.now()}.mp3`;
+    link.target = "_blank";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Downloading speech...");
+  };
+
+  const handleDownloadWithMusic = async () => {
+    if (!narationdata?.audioUrl || !selectedBgMusic) {
+      toast.warning("No background music selected");
+      return;
+    }
+
+    toast.info("Preparing download with background music...");
+    
+    // For client-side, we'll open a note about mixing
+    // In production, this would call a server endpoint to mix audio
+    toast.info("Download with mixed audio - Please use an audio editor to combine the tracks", {
+      duration: 5000,
+      description: `Speech: ${narationdata.audioUrl.split('/').pop()}\nMusic: ${selectedBgMusic.filename}`,
+    });
+
+    // Download both files
+    const speechLink = document.createElement("a");
+    speechLink.href = narationdata.audioUrl;
+    speechLink.download = `speech-${Date.now()}.mp3`;
+    speechLink.target = "_blank";
+    document.body.appendChild(speechLink);
+    speechLink.click();
+    document.body.removeChild(speechLink);
+
+    setTimeout(() => {
+      const musicLink = document.createElement("a");
+      musicLink.href = selectedBgMusic.url;
+      musicLink.download = selectedBgMusic.filename;
+      musicLink.target = "_blank";
+      document.body.appendChild(musicLink);
+      musicLink.click();
+      document.body.removeChild(musicLink);
+    }, 500);
+  };
+
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
 useEffect(() => {
@@ -275,6 +370,10 @@ useEffect(() => {
     if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
+    }
+    if (bgMusicRef.current) {
+        bgMusicRef.current.pause();
+        bgMusicRef.current = null;
     }
 
     setCurrentTime(0);
@@ -288,6 +387,10 @@ useEffect(() => {
 
     audio.addEventListener("ended", () => {
         setIsPlaying(false);
+        // Also pause bg music when speech ends
+        if (bgMusicRef.current) {
+            bgMusicRef.current.pause();
+        }
     });
 
     audio.play().catch(e => console.log('Auto-play blocked:', e));
@@ -297,6 +400,10 @@ useEffect(() => {
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current = null;
+        }
+        if (bgMusicRef.current) {
+            bgMusicRef.current.pause();
+            bgMusicRef.current = null;
         }
     };
 }, [narationdata]);
@@ -405,8 +512,19 @@ useEffect(() => {
           <span className="text-zinc-400">{narationdata?.voiceName}</span>
           <span className="mx-1.5">•</span>
           {narationdata?.mood}
-          <span className="mx-1.5">•</span>
-          🎵 {narationdata?.bgMusicCategory?.replace('_', ' ')}
+          {selectedBgMusic ? (
+            <>
+              <span className="mx-1.5">•</span>
+              <span className="text-blue-400 flex items-center gap-1 inline-flex">
+                <Volume2 size={11} /> {selectedBgMusic.name}
+              </span>
+            </>
+          ) : narationdata?.bgMusicCategory && (
+            <>
+              <span className="mx-1.5">•</span>
+              🎵 {narationdata?.bgMusicCategory?.replace('_', ' ')}
+            </>
+          )}
         </p>
       </div>
 
@@ -469,18 +587,67 @@ useEffect(() => {
       </div>
 
       {/* Right — Actions */}
-      <div className="flex items-center gap-3 flex-1 justify-end">
-        {/* Download */}
-        <a
-          href={narationdata?.audioUrl}
-          download="narration.mp3"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition-all"
-          title="Download"
+      <div className="flex items-center gap-2 flex-1 justify-end">
+        {/* Add Background Music Button */}
+        <button
+          onClick={() => setShowMusicModal(true)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+            selectedBgMusic 
+              ? "bg-blue-500/20 text-blue-400 border border-blue-500/30" 
+              : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+          }`}
+          title={selectedBgMusic ? `Playing: ${selectedBgMusic.name}` : "Add Background Music"}
         >
-          <Download size={19} strokeWidth={1.5} />
-        </a>
+          <Music size={14} />
+          {selectedBgMusic ? "Change Music" : "Add Music"}
+        </button>
+
+        {/* Remove BG Music (if selected) */}
+        {selectedBgMusic && (
+          <button
+            onClick={handleRemoveBgMusic}
+            className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-full transition-all"
+            title="Remove Background Music"
+          >
+            <X size={14} />
+          </button>
+        )}
+
+        {/* Download Dropdown */}
+        <div className="relative group">
+          <button
+            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition-all"
+            title="Download Options"
+          >
+            <Download size={19} strokeWidth={1.5} />
+          </button>
+          
+          {/* Dropdown Menu */}
+          <div className="absolute right-0 bottom-full mb-2 w-52 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+            <div className="p-1">
+              <button
+                onClick={handleDownloadSpeechOnly}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 rounded-md transition-colors"
+              >
+                <Download size={14} />
+                Download Speech Only
+              </button>
+              <button
+                onClick={handleDownloadWithMusic}
+                disabled={!selectedBgMusic}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
+                  selectedBgMusic 
+                    ? "text-zinc-300 hover:bg-zinc-700" 
+                    : "text-zinc-500 cursor-not-allowed"
+                }`}
+              >
+                <Music size={14} />
+                Download with Music
+                {!selectedBgMusic && <span className="text-[10px] text-zinc-600 ml-auto">(Select music first)</span>}
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Close */}
         <button
@@ -491,6 +658,8 @@ useEffect(() => {
             setIsPlayingPreview(false);
             setCurrentTime(0);
             setDuration(0);
+            setSelectedBgMusic(null);
+            setShowMusicPopup(false);
           }}
           className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition-all"
           title="Close"
@@ -502,6 +671,57 @@ useEffect(() => {
     </div>
   </div>
 )}
+
+{/* Background Music Popup Toast */}
+{showMusicPopup && isPlayingPreview && (
+  <div className="fixed bottom-28 right-6 z-50 animate-in slide-in-from-right-5 fade-in duration-300">
+    <div className="bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl p-4 w-72">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center">
+            <Music className="w-4 h-4 text-blue-400" />
+          </div>
+          <div>
+            <h4 className="text-sm font-medium text-white">Enhance Your Speech</h4>
+            <p className="text-[11px] text-zinc-400">Add subtle background music</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowMusicPopup(false)}
+          className="text-zinc-500 hover:text-zinc-300 transition-colors"
+        >
+          <X size={16} />
+        </button>
+      </div>
+      
+      <button
+        onClick={() => {
+          setShowMusicModal(true);
+          setShowMusicPopup(false);
+        }}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+      >
+        <Music size={16} />
+        Add Background Music
+      </button>
+      
+      <button
+        onClick={() => setShowMusicPopup(false)}
+        className="w-full text-zinc-400 hover:text-zinc-300 text-xs mt-2 py-1 transition-colors"
+      >
+        Maybe later
+      </button>
+    </div>
+  </div>
+)}
+
+{/* Background Music Modal */}
+<BackgroundMusicModal
+  open={showMusicModal}
+  onOpenChange={setShowMusicModal}
+  onSelectMusic={handleMusicSelect}
+  currentSpeechUrl={narationdata?.audioUrl}
+/>
 
 
       </main>

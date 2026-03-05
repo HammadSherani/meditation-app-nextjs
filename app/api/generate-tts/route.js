@@ -50,18 +50,6 @@ const moodSettings = {
     neutral: { stability: 1.0, similarity_boost: 0.5, style: 0.0 },
 };
 
-const bgMusicMap = {
-    peaceful_piano: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8f89b8e2b.mp3",
-    ambient_nature: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8e6b7b5b0.mp3",
-    soft_lofi: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_0b8f9c1a1f.mp3",
-    cinematic_emotional: "https://cdn.pixabay.com/download/audio/2022/04/18/audio_7d3f5e4c8d.mp3",
-    upbeat_acoustic: "https://cdn.pixabay.com/download/audio/2022/03/21/audio_9e2d4c3b2a.mp3",
-    energetic_electronic: "https://cdn.pixabay.com/download/audio/2022/06/09/audio_1a2b3c4d5e.mp3",
-    dark_ambient: "https://cdn.pixabay.com/download/audio/2022/03/28/audio_6f7g8h9i0j.mp3",
-    gentle_meditation: "https://cdn.pixabay.com/download/audio/2022/04/05/audio_0k1l2m3n4o.mp3",
-};
-
-
 // Helper: Cloudinary pe buffer upload karo
 function uploadToCloudinary(buffer, options) {
     return new Promise((resolve, reject) => {
@@ -161,53 +149,19 @@ No intros like "Friend:" or "Response:". Just speak directly to them.`,
 
         const voiceBuffer = Buffer.from(await elResponse.arrayBuffer());
 
-        // ── 3. GPT se music category choose karo ──
-        const musicCompletion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-                {
-                    role: "system",
-                    content: `You are a music director. Based on the mood and content of a speech, pick the SINGLE best background music category.
-
-Available categories:
-- peaceful_piano (soft piano, ideal for calm/peaceful/relaxed/grateful moods)
-- ambient_nature (birds, rain, wind, ocean sounds - ideal for meditation/thoughtful/nostalgic)
-- soft_lofi (lo-fi beats, ideal for focused/curious/neutral moods)
-- cinematic_emotional (orchestral/strings, ideal for sad/lonely/hurt/disappointed moods)
-- upbeat_acoustic (light guitar/ukulele, ideal for happy/joyful/playful/proud moods)
-- energetic_electronic (upbeat synths/drums, ideal for excited/energetic/confident moods)
-- dark_ambient (deep drones/tension, ideal for angry/frustrated/aggressive/stressed moods)
-- gentle_meditation (singing bowls/chimes, ideal for anxious/nervous/overwhelmed/exhausted moods)
-
-Respond with ONLY the category name, nothing else.`,
-                },
-                {
-                    role: "user",
-                    content: `Mood: ${currentMood}\nSpeech content: ${generatedScript.substring(0, 300)}`,
-                },
-            ],
-            max_tokens: 20,
-        });
-
-        const musicCategory = musicCompletion.choices[0].message.content.trim().toLowerCase();
-        const bgMusicUrl = bgMusicMap[musicCategory] || bgMusicMap.peaceful_piano;
-
-        // ── 4. Voice Cloudinary pe upload karo ──
+        // ── 3. Voice Cloudinary pe upload karo ──
         const voiceUpload = await uploadToCloudinary(voiceBuffer, {
             resource_type: "video",
             folder: "narrations/voice",
         });
 
-        // ── 5. DB mein save karo ──
         const newNarration = await Narration.create({
             title: userText,
             script: generatedScript,
             voiceName: voiceName,
-            audioUrl: voiceUpload.secure_url,       // Voice URL
-            bgMusicUrl: bgMusicUrl,                  // BG Music URL (direct pixabay link)
+            audioUrl: voiceUpload.secure_url,      
             duration: voiceUpload.duration,
             mood: currentMood,
-            bgMusicCategory: musicCategory,
             settings: {
                 speed: userSpeed,
                 stability: userStability,

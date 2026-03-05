@@ -5,7 +5,7 @@ const NarrationSchema = new mongoose.Schema({
   script: { type: String, required: true }, 
   voiceName: { type: String }, 
   audioUrl: { type: String, required: true }, 
-  // duration: { type: String },
+  duration: { type: String },
   mood: { type: String },
   bgMusicUrl: { type: String },
   bgMusicCategory: { type: String },
