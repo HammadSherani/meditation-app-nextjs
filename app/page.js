@@ -4,7 +4,8 @@ import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { useNarrations } from "@/lib/hooks/useNarrations";
 
-// Components (Make sure you create these files in your components folder)
+import { Mp3Encoder } from '@breezystack/lamejs';
+
 import VoiceLibrary from "@/components/VoiceLibrary";
 import StudioHeader from "@/components/StudioHeader";
 import RecentNarrations from "@/components/RecentNarrations";
@@ -348,59 +349,197 @@ export default function AIStudio() {
     setCurrentTime(0);
     setDuration(0);
     
-    // Set new narration data - this will trigger the useEffect to play
     setNarrationData(narration);
     setIsPlayingPreview(true);
   };
 
   // Download functions
-  const handleDownloadSpeechOnly = () => {
-    if (!narationdata?.audioUrl) return;
-    
-    const link = document.createElement("a");
-    link.href = narationdata.audioUrl;
-    link.download = `speech-${Date.now()}.mp3`;
-    link.target = "_blank";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Downloading speech...");
-  };
+const handleDownloadSpeechOnly = async () => {
+    if (!narationdata?.audioUrl) {
+      toast.warning("No speech audio available");
+      return;
+    }
 
-  const handleDownloadWithMusic = async () => {
+    toast.info("Downloading speech...");
+    
+    try {
+      const speechResponse = await fetch(narationdata.audioUrl);
+      
+      if (!speechResponse.ok) {
+        throw new Error("Failed to download speech file");
+      }
+
+      let fileName = narationdata.title || 'speech';
+      fileName = fileName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/gi, '_')
+        .replace(/_+/g, '_')
+        .substring(0, 50);
+      
+      fileName = `${fileName}_${Date.now()}.mp3`;
+      
+      const speechBlob = await speechResponse.blob();
+      
+      const url = window.URL.createObjectURL(speechBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 100);
+      
+      toast.success(`Speech downloaded as: ${fileName}`);
+      
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download speech: " + error.message);
+    }
+};
+
+const handleDownloadWithMusic = async () => {
     if (!narationdata?.audioUrl || !selectedBgMusic) {
       toast.warning("No background music selected");
       return;
     }
 
-    toast.info("Preparing download with background music...");
+    toast.info("Mixing audio and preparing download...");
     
-    // For client-side, we'll open a note about mixing
-    // In production, this would call a server endpoint to mix audio
-    toast.info("Download with mixed audio - Please use an audio editor to combine the tracks", {
-      duration: 5000,
-      description: `Speech: ${narationdata.audioUrl.split('/').pop()}\nMusic: ${selectedBgMusic.filename}`,
-    });
+    try {
+      const [speechResponse, musicResponse] = await Promise.all([
+        fetch(narationdata.audioUrl),
+        fetch(selectedBgMusic.url)
+      ]);
+      
+      if (!speechResponse.ok || !musicResponse.ok) {
+        throw new Error("Failed to download audio files");
+      }
+      
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      
+      const [speechArrayBuffer, musicArrayBuffer] = await Promise.all([
+        speechResponse.arrayBuffer(),
+        musicResponse.arrayBuffer()
+      ]);
+      
+      const [speechBuffer, musicBuffer] = await Promise.all([
+        audioContext.decodeAudioData(speechArrayBuffer),
+        audioContext.decodeAudioData(musicArrayBuffer)
+      ]);
+      
+      const offlineContext = new OfflineAudioContext(
+        2,
+        Math.max(speechBuffer.length, musicBuffer.length),
+        audioContext.sampleRate
+      );
+      
+      const speechSource = offlineContext.createBufferSource();
+      speechSource.buffer = speechBuffer;
+      speechSource.connect(offlineContext.destination);
+      
+      const musicSource = offlineContext.createBufferSource();
+      musicSource.buffer = musicBuffer;
+      
+      const musicGain = offlineContext.createGain();
+      musicGain.gain.value = 0.3;
+      musicSource.connect(musicGain);
+      musicGain.connect(offlineContext.destination);
+      
+      speechSource.start();
+      musicSource.start();
+      
+      const renderedBuffer = await offlineContext.startRendering();
+      
+      toast.info("Converting to MP3...");
+      const mp3Blob = await bufferToMp3(renderedBuffer);
+      
+      let fileName = narationdata.title || 'mixed-audio';
+      fileName = fileName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/gi, '_')
+        .replace(/_+/g, '_')
+        .substring(0, 50);
+      
+      fileName = `${fileName}_with_music_${Date.now()}.mp3`;
+      
+      const url = URL.createObjectURL(mp3Blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 100);
+      
+      toast.success(`Mixed audio downloaded as: ${fileName}`);
+      
+    } catch (error) {
+      console.error("Mixing error:", error);
+      toast.error("Failed to mix audio: " + error.message);
+    }
+};
 
-    // Download both files
-    const speechLink = document.createElement("a");
-    speechLink.href = narationdata.audioUrl;
-    speechLink.download = `speech-${Date.now()}.mp3`;
-    speechLink.target = "_blank";
-    document.body.appendChild(speechLink);
-    speechLink.click();
-    document.body.removeChild(speechLink);
+const bufferToMp3 = (audioBuffer) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const sampleRate = audioBuffer.sampleRate;
+      const numberOfChannels = audioBuffer.numberOfChannels;
 
-    setTimeout(() => {
-      const musicLink = document.createElement("a");
-      musicLink.href = selectedBgMusic.url;
-      musicLink.download = selectedBgMusic.filename;
-      musicLink.target = "_blank";
-      document.body.appendChild(musicLink);
-      musicLink.click();
-      document.body.removeChild(musicLink);
-    }, 500);
-  };
+      // lamejs sirf mono ya stereo support karta hai
+      const leftChannel = audioBuffer.getChannelData(0);
+      const rightChannel = numberOfChannels > 1
+        ? audioBuffer.getChannelData(1)
+        : audioBuffer.getChannelData(0);
+
+const mp3encoder = new Mp3Encoder(2, sampleRate, 128);
+
+      const mp3Data = [];
+      const sampleBlockSize = 1152;
+
+      const leftInt16 = float32ToInt16(leftChannel);
+      const rightInt16 = float32ToInt16(rightChannel);
+
+      for (let i = 0; i < leftInt16.length; i += sampleBlockSize) {
+        const leftChunk = leftInt16.subarray(i, i + sampleBlockSize);
+        const rightChunk = rightInt16.subarray(i, i + sampleBlockSize);
+
+        const mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+        if (mp3buf.length > 0) {
+          mp3Data.push(new Int8Array(mp3buf));
+        }
+      }
+
+      const mp3buf = mp3encoder.flush();
+      if (mp3buf.length > 0) {
+        mp3Data.push(new Int8Array(mp3buf));
+      }
+
+      const blob = new Blob(mp3Data, { type: 'audio/mp3' });
+      resolve(blob);
+
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
+//  Helper: Float32Array ko Int16Array mein convert karo
+const float32ToInt16 = (float32Array) => {
+  const int16Array = new Int16Array(float32Array.length);
+  for (let i = 0; i < float32Array.length; i++) {
+    const sample = Math.max(-1, Math.min(1, float32Array[i]));
+    int16Array[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+  }
+  return int16Array;
+};
 
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
@@ -421,7 +560,7 @@ useEffect(() => {
     setDuration(0);
 
     const audio = new Audio(narationdata.audioUrl);
-    audio.volume = speechVolume; // Apply current speech volume
+    audio.volume = speechVolume; 
     audioRef.current = audio;
 
     audio.addEventListener("loadedmetadata", () => setDuration(audio.duration));
@@ -452,13 +591,11 @@ useEffect(() => {
 
   useEffect(() => {
     if(!session) {
-      // toast.error("You must be logged in to access the studio.");
-      // alert("You must be logged in to access the studio.");
+      toast.error("You must be logged in to access the studio.");
       router.push("/login");
     }
   },[])
 
-  // console.log("narationdata", narationdata);
 
 
   return (
